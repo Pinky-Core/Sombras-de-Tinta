@@ -12,6 +12,7 @@ public class PlayerController3D : MonoBehaviour
 
     private CharacterController _cc;
     private Vector3 _velocity;
+    private bool _movingHorizontally;
 
     void Awake()
     {
@@ -43,16 +44,32 @@ public class PlayerController3D : MonoBehaviour
 
         Vector3 desired = (camForward * input.y + camRight * input.x) * moveSpeed;
 
+        if (!_movingHorizontally && Mathf.Abs(input.x) > 0.1f)
+        {
+            _movingHorizontally = true;
+            TutorialEventBus.RaiseTaskCompleted(TutorialTaskIds.MoveHorizontal);
+        }
+        else if (_movingHorizontally && Mathf.Abs(input.x) < 0.05f)
+        {
+            _movingHorizontally = false;
+        }
+
         // Smooth horizontal velocity
         Vector3 horizVel = new Vector3(_velocity.x, 0f, _velocity.z);
         float t = _cc.isGrounded ? 1f - Mathf.Exp(-acceleration * Time.deltaTime) : 1f - Mathf.Exp(-(acceleration * airControl) * Time.deltaTime);
         horizVel = Vector3.Lerp(horizVel, desired, t);
 
         // Apply gravity
+        bool jumpPressed = InputProvider.JumpDown();
+        if (jumpPressed)
+        {
+            TutorialEventBus.RaiseTaskCompleted(TutorialTaskIds.Jump);
+        }
+
         if (_cc.isGrounded)
         {
             _velocity.y = -2f; // keep grounded
-            if (InputProvider.JumpDown())
+            if (jumpPressed)
             {
                 _velocity.y = Mathf.Sqrt(2f * Mathf.Abs(gravity) * jumpHeight);
             }

@@ -28,6 +28,20 @@ public class InkDrawer : MonoBehaviour
     public bool enableShapeDetection = true;
     public float shapeDetectionRadius = 3f; // Radio para detectar enemigos cerca del trazo
 
+    [Header("Ink VFX")]
+    [Tooltip("Sistema de partículas para simular gotas que caen del trazo.")]
+    public ParticleSystem inkDropletPrefab;
+    [Range(0f, 1f)] public float dropletSpawnChance = 0.7f;
+    public Vector3 dropletOffset = new Vector3(0f, -0.25f, 0f);
+
+    [Header("Combat Feedback")]
+    [Tooltip("Daño base que hace una raya estándar (enemigos con más vida necesitarán varias).")]
+    public float lineDamage = 1f;
+    [Tooltip("Duración del shake de cámara al matar un enemigo.")]
+    public float killShakeDuration = 0.25f;
+    [Tooltip("Intensidad del shake de cámara al matar un enemigo.")]
+    public float killShakeIntensity = 0.35f;
+
     Vector3 _lastPoint;
     bool _drawing;
     Material _inkMat;
@@ -75,6 +89,7 @@ public class InkDrawer : MonoBehaviour
             _lastPoint = Vector3.positiveInfinity; // force place first
             _currentTraceInk.Clear();
             if (_shapeDetector != null) _shapeDetector.StartTrace();
+            TutorialEventBus.RaiseTaskCompleted(TutorialTaskIds.DrawLine);
         }
         if (InputProvider.LeftMouseUp())
         {
@@ -106,6 +121,10 @@ public class InkDrawer : MonoBehaviour
                             // Sin Shift = plataforma, Con Shift = aliado (coherente con HUD)
                             bool toAlly = InputProvider.ShiftHeld();
                             enemy.ApplyRedraw(toAlly);
+                            if (toAlly)
+                            {
+                                TutorialEventBus.RaiseTaskCompleted(TutorialTaskIds.ConvertAlly);
+                            }
                             currentInk -= costRedraw;
                             _drawing = false; // Consumir el trazo y detener dibujo para evitar múltiples conversiones
                             _lastPoint = Vector3.positiveInfinity; // Reset para el próximo trazo
@@ -217,8 +236,30 @@ public class InkDrawer : MonoBehaviour
         pm.staticFriction = 0.8f;
         col.material = pm;
         s.layer = gameObject.layer; // keep same layer as owner
+
+        SpawnInkDroplets(position);
         
         return s;
+    }
+
+    void SpawnInkDroplets(Vector3 position)
+    {
+        if (inkDropletPrefab == null)
+        {
+            return;
+        }
+
+        if (dropletSpawnChance < 1f && Random.value > dropletSpawnChance)
+        {
+            return;
+        }
+
+        Vector3 spawnPos = position + dropletOffset;
+        ParticleSystem droplets = Instantiate(inkDropletPrefab, spawnPos, Quaternion.identity);
+        droplets.Play();
+        var main = droplets.main;
+        float lifetime = main.duration + main.startLifetime.constantMax + 0.5f;
+        Destroy(droplets.gameObject, Mathf.Max(0.1f, lifetime));
     }
 
     // Método público para regenerar tinta (solo desde sistema de combate)
@@ -324,6 +365,7 @@ public class InkDrawer : MonoBehaviour
                 {
                     targetEnemy.ApplyRedraw(true); // Shift + raya = aliado
                     actionPerformed = true;
+                    TutorialEventBus.RaiseTaskCompleted(TutorialTaskIds.ConvertAlly);
                     Debug.Log("Shift + raya - Enemigo convertido a aliado!");
                 }
                 else
@@ -335,9 +377,17 @@ public class InkDrawer : MonoBehaviour
             {
                 if (targetEnemy.CanKill)
                 {
-                    targetEnemy.ApplyDeath(); // Solo raya = muerte
-                    actionPerformed = true;
-                    Debug.Log("Raya sobre enemigo - Enemigo eliminado!");
+                    bool killed = ApplyLineDamage(targetEnemy);
+                    if (killed)
+                    {
+                        actionPerformed = true;
+                        TutorialEventBus.RaiseTaskCompleted(TutorialTaskIds.KillWithLine);
+                        Debug.Log("Raya sobre enemigo - Enemigo eliminado!");
+                    }
+                    else
+                    {
+                        Debug.Log("Raya detectada pero el enemigo aún sigue con vida.");
+                    }
                 }
                 else
                 {
@@ -373,6 +423,40 @@ public class InkDrawer : MonoBehaviour
         {
             _shapeDetector.ClearTrace();
         }
+    }
+
+    void TriggerKillFeedback()
+    {
+        if (killShakeDuration <= 0f || killShakeIntensity <= 0f)
+        {
+            return;
+        }
+
+        CameraShake.Instance?.Shake(killShakeDuration, killShakeIntensity);
+    }
+
+    bool ApplyLineDamage(EnemyRedraw enemy)
+    {
+        if (enemy == null)
+        {
+            return false;
+        }
+
+        float damage = Mathf.Max(0.01f, lineDamage);
+        var enemyPatrol = enemy.GetComponent<EnemyPatrol>();
+        if (enemyPatrol != null)
+        {
+            bool killed = enemyPatrol.ApplyDamage(damage);
+            if (killed)
+            {
+                TriggerKillFeedback();
+            }
+            return killed;
+        }
+
+        enemy.ApplyDeath();
+        TriggerKillFeedback();
+        return true;
     }
 
     void OnGUI()

@@ -9,6 +9,7 @@ public class EnemyPatrol : MonoBehaviour
     public float chaseRange = 6f;
     public float attackRange = 1.2f;
     public float attackCooldown = 1.0f;
+    public float attackDamage = 1f;
     public Vector3 localPointA = new Vector3(-3f, 0f, 0f);
     public Vector3 localPointB = new Vector3(3f, 0f, 0f);
 
@@ -31,6 +32,7 @@ public class EnemyPatrol : MonoBehaviour
     bool _toB = true;
     float _attackTimer;
     bool _dead;
+    PlayerHealth _playerHealth;
 
     void Start()
     {
@@ -41,6 +43,7 @@ public class EnemyPatrol : MonoBehaviour
         _baseZ = transform.position.z;
         if (!animator) animator = GetComponentInChildren<Animator>();
         currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
+        CachePlayerHealth();
     }
 
     void Update()
@@ -98,20 +101,24 @@ public class EnemyPatrol : MonoBehaviour
             if (distX <= attackRange && _attackTimer <= 0f)
             {
                 if (animator && !string.IsNullOrEmpty(attackTrigger)) animator.SetTrigger(attackTrigger);
+                DealDamageToPlayer();
                 _attackTimer = attackCooldown;
             }
         }
     }
 
-    public void ApplyDamage(float amount)
+    public bool ApplyDamage(float amount)
     {
-        if (_dead) return;
+        if (_dead) return false;
         currentHealth -= Mathf.Abs(amount);
+        currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
         if (animator && !string.IsNullOrEmpty(hitTrigger)) animator.SetTrigger(hitTrigger);
         if (currentHealth <= 0f)
         {
             Die();
+            return true;
         }
+        return false;
     }
 
     void Die()
@@ -131,4 +138,35 @@ public class EnemyPatrol : MonoBehaviour
             Destroy(gameObject, 2f);
         }
     }
+
+    void DealDamageToPlayer()
+    {
+        if (_player == null)
+        {
+            var playerComp = FindFirstObjectByType<PlayerController3D>();
+            if (playerComp != null) _player = playerComp.transform;
+        }
+
+        CachePlayerHealth();
+
+        if (_playerHealth != null)
+        {
+            _playerHealth.ApplyDamage(attackDamage);
+        }
+    }
+
+    void CachePlayerHealth()
+    {
+        if (_player == null)
+        {
+            return;
+        }
+
+        if (_playerHealth == null || _playerHealth.gameObject != _player.gameObject)
+        {
+            _playerHealth = _player.GetComponent<PlayerHealth>();
+        }
+    }
+
+    public bool IsDead => _dead;
 }

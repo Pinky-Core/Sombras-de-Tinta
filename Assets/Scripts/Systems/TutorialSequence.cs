@@ -1,197 +1,274 @@
 using System;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 
 /// <summary>
-/// Controls a multi-phase tutorial where each phase waits for the player to reach its trigger.
-/// Attach this to a scene manager object and configure the phases from the inspector.
+/// Manages a phase-based tutorial UI that lives on the HUD. Each phase exposes tasks (checkmarks) that disappear as they are completed.
 /// </summary>
 [DisallowMultipleComponent]
 public class TutorialSequence : MonoBehaviour
 {
-    [SerializeField, Tooltip("Tag that identifies the player object that should progress the tutorial.")]
-    private string playerTag = "Player";
+    [Header("Popup UI")]
+    [SerializeField] private CanvasGroup popupCanvas;
+    [SerializeField] private TMP_Text titleLabel;
+    [SerializeField] private TMP_Text phaseNumberLabel;
+    [SerializeField] private TMP_Text phaseNameLabel;
+    [SerializeField] private Transform taskContainer;
+    [SerializeField] private TutorialTaskItemUI taskItemPrefab;
+    [SerializeField, Min(0f)] private float completedTaskHideDelay = 0.25f;
 
-    [SerializeField, Tooltip("Ordered list of tutorial phases that will be unlocked step by step.")]
-    private List<TutorialPhase> phases = new List<TutorialPhase>();
+    [Header("Phases")]
+    [SerializeField] private List<TutorialPhase> phases = new List<TutorialPhase>();
 
     [SerializeField, Tooltip("Invoked once all phases have been completed.")]
     private UnityEvent onTutorialFinished;
 
+    private readonly Dictionary<string, TaskRuntime> activeTasks = new Dictionary<string, TaskRuntime>(StringComparer.OrdinalIgnoreCase);
+    private readonly List<TaskRuntime> currentPhaseTasks = new List<TaskRuntime>();
     private int currentPhaseIndex = -1;
-
-    private void Awake()
-    {
-        for (int i = 0; i < phases.Count; i++)
-        {
-            TutorialPhase phase = phases[i];
-            if (phase == null)
-            {
-                continue;
-            }
-
-            phase.HideTexts();
-            SetupTriggerProxy(phase, i);
-        }
-    }
+    private int tasksInCurrentPhase;
+    private int tasksCompletedInCurrentPhase;
 
     private void OnEnable()
     {
+        TutorialEventBus.TaskCompleted += HandleTaskCompleted;
+
         if (phases.Count == 0)
         {
+            ClearCurrentPhaseUI();
+            HidePopup();
             return;
         }
 
-        AdvanceToPhase(0);
+        if (currentPhaseIndex < 0)
+        {
+            AdvanceToPhase(0);
+        }
+        else
+        {
+            RebuildPhaseUI();
+        }
     }
 
-    private void SetupTriggerProxy(TutorialPhase phase, int phaseIndex)
+    private void OnDisable()
     {
-        if (phase.Trigger == null)
-        {
-            Debug.LogWarning($"TutorialSequence: Phase '{phase.Name}' is missing a trigger collider.", this);
-            return;
-        }
-
-        phase.Trigger.isTrigger = true;
-        phase.Trigger.enabled = false;
-
-        TutorialTriggerProxy proxy = phase.Trigger.GetComponent<TutorialTriggerProxy>();
-        if (proxy == null)
-        {
-            proxy = phase.Trigger.gameObject.AddComponent<TutorialTriggerProxy>();
-        }
-
-        proxy.Configure(this, phaseIndex);
+        TutorialEventBus.TaskCompleted -= HandleTaskCompleted;
     }
 
-    internal void HandleTriggerActivated(int phaseIndex, Collider other)
+    private void RebuildPhaseUI()
     {
-        if (!other.CompareTag(playerTag))
+        ClearCurrentPhaseUI();
+
+        if (currentPhaseIndex < 0 || currentPhaseIndex >= phases.Count)
         {
+            HidePopup();
             return;
         }
 
-        if (phaseIndex != currentPhaseIndex)
-        {
-            return;
-        }
-
-        CompleteCurrentPhase();
+        PopulatePhase(phases[currentPhaseIndex]);
     }
 
-    private void AdvanceToPhase(int newIndex)
+    private void AdvanceToPhase(int nextIndex)
     {
-        if (newIndex < 0 || newIndex >= phases.Count)
+        ClearCurrentPhaseUI();
+
+        if (nextIndex >= phases.Count)
         {
             currentPhaseIndex = phases.Count;
+            HidePopup();
             onTutorialFinished?.Invoke();
             return;
         }
 
-        currentPhaseIndex = newIndex;
-
-        TutorialPhase phase = phases[currentPhaseIndex];
-        phase.ShowTexts();
-        phase.Trigger?.gameObject.SetActive(true);
-        if (phase.Trigger != null)
-        {
-            phase.Trigger.enabled = true;
-        }
-
-        phase.OnPhaseStarted?.Invoke();
+        currentPhaseIndex = Mathf.Clamp(nextIndex, 0, phases.Count - 1);
+        PopulatePhase(phases[currentPhaseIndex]);
     }
 
-    private void CompleteCurrentPhase()
+    private void PopulatePhase(TutorialPhase phase)
     {
-        if (currentPhaseIndex < 0 || currentPhaseIndex >= phases.Count)
+        if (phase == null)
         {
             return;
         }
 
-        TutorialPhase phase = phases[currentPhaseIndex];
+        ShowPopup();
+        UpdatePhaseLabels(phase);
 
-        if (phase.Trigger != null)
+        tasksCompletedInCurrentPhase = 0;
+        tasksInCurrentPhase = 0;
+
+        foreach (var task in phase.Tasks)
         {
-            phase.Trigger.enabled = false;
+            if (task == null || string.IsNullOrEmpty(task.Id))
+            {
+                continue;
+            }
+
+            if (activeTasks.ContainsKey(task.Id))
+            {
+                Debug.LogWarning($"TutorialSequence: Duplicate task id '{task.Id}' detected. Skipping.", this);
+                continue;
+            }
+
+            TutorialTaskItemUI widget = null;
+            if (taskItemPrefab != null && taskContainer != null)
+            {
+                widget = Instantiate(taskItemPrefab, taskContainer);
+                widget.Bind(task.Description);
+            }
+
+            var runtime = new TaskRuntime(task, widget);
+            currentPhaseTasks.Add(runtime);
+            activeTasks.Add(task.Id, runtime);
+            tasksInCurrentPhase++;
         }
 
-        phase.HideTexts();
-        phase.OnPhaseCompleted?.Invoke();
+        if (tasksInCurrentPhase == 0)
+        {
+            Debug.LogWarning("TutorialSequence: Phase has no tasks, advancing automatically.", this);
+            AdvanceToPhase(currentPhaseIndex + 1);
+        }
+    }
 
-        AdvanceToPhase(currentPhaseIndex + 1);
+    private void HandleTaskCompleted(string taskId)
+    {
+        if (string.IsNullOrEmpty(taskId))
+        {
+            return;
+        }
+
+        if (!activeTasks.TryGetValue(taskId, out var runtime) || runtime.Completed)
+        {
+            return;
+        }
+
+        runtime.Completed = true;
+        tasksCompletedInCurrentPhase = Mathf.Clamp(tasksCompletedInCurrentPhase + 1, 0, tasksInCurrentPhase);
+
+        if (runtime.Widget != null)
+        {
+            runtime.Widget.PlayCompleted(completedTaskHideDelay, () => RemoveRuntime(taskId, runtime));
+        }
+        else
+        {
+            RemoveRuntime(taskId, runtime);
+        }
+
+        if (tasksInCurrentPhase > 0 && tasksCompletedInCurrentPhase >= tasksInCurrentPhase)
+        {
+            AdvanceToPhase(currentPhaseIndex + 1);
+        }
+    }
+
+    private void RemoveRuntime(string taskId, TaskRuntime runtime)
+    {
+        activeTasks.Remove(taskId);
+        currentPhaseTasks.Remove(runtime);
+    }
+
+    private void ClearCurrentPhaseUI()
+    {
+        foreach (var runtime in currentPhaseTasks)
+        {
+            if (runtime.Widget != null)
+            {
+                Destroy(runtime.Widget.gameObject);
+            }
+
+            if (!string.IsNullOrEmpty(runtime.TaskId))
+            {
+                activeTasks.Remove(runtime.TaskId);
+            }
+        }
+
+        currentPhaseTasks.Clear();
+        tasksInCurrentPhase = 0;
+        tasksCompletedInCurrentPhase = 0;
+
+        if (taskContainer != null)
+        {
+            for (int i = taskContainer.childCount - 1; i >= 0; i--)
+            {
+                Destroy(taskContainer.GetChild(i).gameObject);
+            }
+        }
+    }
+
+    private void UpdatePhaseLabels(TutorialPhase phase)
+    {
+        if (titleLabel != null && string.IsNullOrWhiteSpace(titleLabel.text))
+        {
+            titleLabel.text = "Tutorial";
+        }
+
+        if (phaseNumberLabel != null)
+        {
+            phaseNumberLabel.text = $"Fase {currentPhaseIndex + 1}";
+        }
+
+        if (phaseNameLabel != null)
+        {
+            phaseNameLabel.text = phase.DisplayName;
+        }
+    }
+
+    private void ShowPopup()
+    {
+        if (popupCanvas == null)
+        {
+            return;
+        }
+
+        popupCanvas.alpha = 1f;
+        popupCanvas.blocksRaycasts = true;
+        popupCanvas.interactable = true;
+    }
+
+    private void HidePopup()
+    {
+        if (popupCanvas != null)
+        {
+            popupCanvas.alpha = 0f;
+            popupCanvas.blocksRaycasts = false;
+            popupCanvas.interactable = false;
+        }
     }
 
     [Serializable]
     private class TutorialPhase
     {
-        [SerializeField] private string phaseName = "Phase";
-        [SerializeField, Tooltip("Trigger collider that unlocks this phase when the player enters it.")]
-        private Collider trigger;
+        [SerializeField] private string displayName = "Nueva acción";
+        [SerializeField] private List<TutorialTaskDefinition> tasks = new List<TutorialTaskDefinition>();
 
-        [SerializeField, Tooltip("World-space text objects that should be visible while this phase is active.")]
-        private GameObject[] textObjects;
-
-        [SerializeField] private UnityEvent onPhaseStarted;
-        [SerializeField] private UnityEvent onPhaseCompleted;
-
-        public string Name => phaseName;
-        public Collider Trigger => trigger;
-        public UnityEvent OnPhaseStarted => onPhaseStarted;
-        public UnityEvent OnPhaseCompleted => onPhaseCompleted;
-
-        public void ShowTexts()
-        {
-            if (textObjects == null)
-            {
-                return;
-            }
-
-            foreach (GameObject text in textObjects)
-            {
-                if (text != null)
-                {
-                    text.SetActive(true);
-                }
-            }
-        }
-
-        public void HideTexts()
-        {
-            if (textObjects == null)
-            {
-                return;
-            }
-
-            foreach (GameObject text in textObjects)
-            {
-                if (text != null)
-                {
-                    text.SetActive(false);
-                }
-            }
-        }
+        public string DisplayName => displayName;
+        public IReadOnlyList<TutorialTaskDefinition> Tasks => tasks;
     }
 
-    /// <summary>
-    /// Lightweight proxy attached to each trigger to let the manager know when the player enters it.
-    /// </summary>
-    [RequireComponent(typeof(Collider))]
-    private class TutorialTriggerProxy : MonoBehaviour
+    [Serializable]
+    private class TutorialTaskDefinition
     {
-        private TutorialSequence owner;
-        private int phaseIndex;
+        [SerializeField, Tooltip("Id que debe coincidir con lo que reportan los scripts de gameplay. Ej: move_horizontal.")]
+        private string taskId;
 
-        public void Configure(TutorialSequence sequence, int index)
-        {
-            owner = sequence;
-            phaseIndex = index;
-        }
+        [SerializeField, Tooltip("Texto que se mostrará junto al checkmark.")]
+        private string description;
 
-        private void OnTriggerEnter(Collider other)
+        public string Id => taskId;
+        public string Description => description;
+    }
+
+    private sealed class TaskRuntime
+    {
+        public readonly string TaskId;
+        public readonly TutorialTaskItemUI Widget;
+        public bool Completed;
+
+        public TaskRuntime(TutorialTaskDefinition definition, TutorialTaskItemUI widget)
         {
-            owner?.HandleTriggerActivated(phaseIndex, other);
+            TaskId = definition?.Id ?? string.Empty;
+            Widget = widget;
         }
     }
 }

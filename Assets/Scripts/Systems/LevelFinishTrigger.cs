@@ -90,6 +90,8 @@ public class LevelFinishTrigger : MonoBehaviour
         
         // Mostrar panel de victoria
         ShowVictoryPanel();
+
+        TutorialEventBus.RaiseTaskCompleted(TutorialTaskIds.FinishRoute);
     }
     
     void PlayFinishEffects()
