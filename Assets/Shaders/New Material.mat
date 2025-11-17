@@ -134,7 +134,7 @@ Material:
     - _SrcBlendAlpha: 1
     - _Surface: 0
     - _SurfaceSpeed: 17.46
-    - _SurfaceWiggle: 0.06
+    - _SurfaceWiggle: 0
     - _WobbleAmplitude: 0.004
     - _WobbleFrequency: 11.55
     - _WorkflowMode: 1

@@ -1,6 +1,11 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
+using StarterAssets;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 [RequireComponent(typeof(Camera))]
 public class LevelIntroPanorama : MonoBehaviour
@@ -37,8 +42,12 @@ public class LevelIntroPanorama : MonoBehaviour
     bool _playing;
 
     // Bloqueos durante la intro
+    readonly List<Behaviour> _disabledDuringIntro = new List<Behaviour>();
     Component _playerMovement;
     InkDrawer _inkDrawer;
+#if ENABLE_INPUT_SYSTEM
+    PlayerInput _playerInput;
+#endif
 
     void Awake()
     {
@@ -65,6 +74,44 @@ public class LevelIntroPanorama : MonoBehaviour
         StartCoroutine(PlayIntroCo());
     }
 
+    void DisablePlayerControl()
+    {
+        _disabledDuringIntro.Clear();
+
+        _playerMovement = (Component)(player.GetComponent<PlayerController3D>() ?? (Component)player.GetComponent<PlayerControllerSide3D>() ?? player.GetComponent<ThirdPersonController>());
+        AddBehaviour(_playerMovement as Behaviour);
+        AddBehaviour(player.GetComponent<StarterAssetsInputs>());
+#if ENABLE_INPUT_SYSTEM
+        _playerInput = player.GetComponent<PlayerInput>();
+        if (_playerInput && _playerInput.enabled) _playerInput.enabled = false;
+#endif
+        _inkDrawer = player.GetComponent<InkDrawer>();
+        if (_inkDrawer && _inkDrawer.enabled) _inkDrawer.enabled = false;
+    }
+
+    void EnablePlayerControl()
+    {
+        foreach (var behaviour in _disabledDuringIntro)
+        {
+            if (behaviour) behaviour.enabled = true;
+        }
+        _disabledDuringIntro.Clear();
+
+        if (_inkDrawer) _inkDrawer.enabled = true;
+#if ENABLE_INPUT_SYSTEM
+        if (_playerInput) _playerInput.enabled = true;
+#endif
+    }
+
+    void AddBehaviour(Behaviour behaviour)
+    {
+        if (behaviour && behaviour.enabled)
+        {
+            behaviour.enabled = false;
+            _disabledDuringIntro.Add(behaviour);
+        }
+    }
+
 
     IEnumerator PlayIntroCo()
     {
@@ -76,11 +123,7 @@ public class LevelIntroPanorama : MonoBehaviour
         // Disable follow during the cinematic
         if (followCamera) followCamera.enabled = false;
 
-        // Bloquear movimiento del jugador y dibujo
-        _playerMovement = (Component)(player.GetComponent<PlayerController3D>() ?? (Component)player.GetComponent<PlayerControllerSide3D>());
-        if (_playerMovement) ((Behaviour)_playerMovement).enabled = false;
-        _inkDrawer = player.GetComponent<InkDrawer>();
-        if (_inkDrawer) _inkDrawer.enabled = false;
+        DisablePlayerControl();
 
         // Position camera near player start at configured height/offset
         Vector3 followLike = new Vector3(player.position.x, yHeight, (player.position.z + zOffset));
@@ -136,9 +179,7 @@ public class LevelIntroPanorama : MonoBehaviour
             followCamera.enabled = true;
         }
 
-        // Rehabilitar control y dibujo
-        if (_playerMovement) ((Behaviour)_playerMovement).enabled = true;
-        if (_inkDrawer) _inkDrawer.enabled = true;
+        EnablePlayerControl();
 
         _playing = false;
     }

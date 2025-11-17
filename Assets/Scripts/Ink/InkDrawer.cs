@@ -181,8 +181,8 @@ public class InkDrawer : MonoBehaviour
                     float cost = dist * costPerMeter;
                     if (currentInk >= cost)
                     {
-                        var inkSphere = PlaceInkSphere(point);
-                        _currentTraceInk.Add(inkSphere);
+                        var inkSegment = PlaceInkSegment(point, float.IsFinite(_lastPoint.x) ? _lastPoint : (Vector3?)null);
+                        _currentTraceInk.Add(inkSegment);
                         currentInk -= cost;
                         _lastPoint = point;
                         
@@ -191,8 +191,8 @@ public class InkDrawer : MonoBehaviour
                     }
                     else if (currentInk > 0.01f)
                     {
-                        var inkSphere = PlaceInkSphere(point);
-                        _currentTraceInk.Add(inkSphere);
+                        var inkSegment = PlaceInkSegment(point, float.IsFinite(_lastPoint.x) ? _lastPoint : (Vector3?)null);
+                        _currentTraceInk.Add(inkSegment);
                         currentInk = 0f;
                         
                         // Agregar punto al detector de formas
@@ -206,15 +206,31 @@ public class InkDrawer : MonoBehaviour
         // if (InputProvider.RefillDown()) currentInk = maxInk;  // Comentado para el prototipo final
     }
 
-    GameObject PlaceInkSphere(Vector3 position)
+    GameObject PlaceInkSegment(Vector3 position, Vector3? previousPoint)
     {
-        GameObject s = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        s.name = "InkPiece";
-        s.transform.position = position;
-        s.transform.localScale = Vector3.one * (brushRadius * 2f);
-        
+        GameObject segment = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        segment.name = "InkPiece";
+
+        // Definir orientaciA3n y escala para formar un trazo alargado entre puntos
+        Vector3 dir = previousPoint.HasValue ? (position - previousPoint.Value) : Vector3.right * brushRadius;
+        if (dir.sqrMagnitude < 1e-5f) dir = Vector3.right * brushRadius;
+
+        // Mantener el trazo en el plano XZ para que sea caminable
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 1e-5f) dir = Vector3.forward * brushRadius;
+
+        float length = Mathf.Max(brushRadius * 2f, dir.magnitude);
+        Vector3 center = previousPoint.HasValue ? (previousPoint.Value + position) * 0.5f : position;
+
+        segment.transform.position = center;
+        segment.transform.rotation = Quaternion.LookRotation(dir.normalized, Vector3.up);
+        // Sutileza visual: un pequeA1o roll aleatorio para dar sensaciA3n de pincel
+        segment.transform.rotation *= Quaternion.AngleAxis(Random.Range(-6f, 6f), Vector3.forward);
+
+        segment.transform.localScale = new Vector3(brushRadius * 2f, brushRadius * 1.2f, length + brushRadius * 0.4f);
+
         // Configurar material con color personalizado
-        var rend = s.GetComponent<Renderer>();
+        var rend = segment.GetComponent<Renderer>();
         if (rend) 
         {
             var mat = _inkMat != null ? _inkMat : new Material(Shader.Find("Universal Render Pipeline/Lit"));
@@ -228,18 +244,18 @@ public class InkDrawer : MonoBehaviour
         }
         
         // Configurar collider
-        var col = s.GetComponent<Collider>();
+        var col = segment.GetComponent<Collider>();
         var pm = new PhysicsMaterial();
         pm.frictionCombine = PhysicsMaterialCombine.Average;
         pm.bounceCombine = PhysicsMaterialCombine.Minimum;
         pm.dynamicFriction = 0.6f;
         pm.staticFriction = 0.8f;
         col.material = pm;
-        s.layer = gameObject.layer; // keep same layer as owner
+        segment.layer = gameObject.layer; // keep same layer as owner
 
         SpawnInkDroplets(position);
         
-        return s;
+        return segment;
     }
 
     void SpawnInkDroplets(Vector3 position)

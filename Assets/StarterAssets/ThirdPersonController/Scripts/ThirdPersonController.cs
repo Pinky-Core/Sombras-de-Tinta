@@ -75,6 +75,12 @@ namespace StarterAssets
         [Tooltip("For locking the camera position on all axis")]
         public bool LockCameraPosition = false;
 
+        [Header("Ground Contact")]
+        [Tooltip("Extra distance to snap the controller to the floor to avoid tunnelling through thin meshes (ink, plataformas finas).")]
+        public float GroundSnapDistance = 0.3f;
+        [Tooltip("Small lift for the snap ray origin to keep it from starting inside the floor.")]
+        public float GroundSnapRayOffset = 0.1f;
+
         // cinemachine
         private float _cinemachineTargetYaw;
         private float _cinemachineTargetPitch;
@@ -139,6 +145,11 @@ namespace StarterAssets
             _hasAnimator = TryGetComponent(out _animator);
             _controller = GetComponent<CharacterController>();
             _input = GetComponent<StarterAssetsInputs>();
+
+            // Mejora de colisiones: evitar que ignore desplazamientos pequeA1os y recuperar solapamientos con geometrA-a nueva (tinta dibujada)
+            _controller.minMoveDistance = 0f;
+            _controller.enableOverlapRecovery = true;
+            if (_controller.skinWidth < 0.06f) _controller.skinWidth = 0.08f;
 #if ENABLE_INPUT_SYSTEM 
             _playerInput = GetComponent<PlayerInput>();
 #else
@@ -213,6 +224,8 @@ namespace StarterAssets
 
         private void Move()
         {
+            Vector2 horizontalInput = new Vector2(_input.move.x, 0f);
+
             // set target speed based on move speed, sprint speed and if sprint is pressed
             float targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
 
@@ -220,13 +233,13 @@ namespace StarterAssets
 
             // note: Vector2's == operator uses approximation so is not floating point error prone, and is cheaper than magnitude
             // if there is no input, set the target speed to 0
-            if (_input.move == Vector2.zero) targetSpeed = 0.0f;
+            if (horizontalInput == Vector2.zero) targetSpeed = 0.0f;
 
             // a reference to the players current horizontal velocity
-            float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
+            float currentHorizontalSpeed = Mathf.Abs(_controller.velocity.x);
 
             float speedOffset = 0.1f;
-            float inputMagnitude = _input.analogMovement ? _input.move.magnitude : 1f;
+            float inputMagnitude = _input.analogMovement ? horizontalInput.magnitude : 1f;
 
             // accelerate or decelerate to target speed
             if (currentHorizontalSpeed < targetSpeed - speedOffset ||
@@ -249,33 +262,55 @@ namespace StarterAssets
             if (_animationBlend < 0.01f) _animationBlend = 0f;
 
             // normalise input direction
-            Vector3 inputDirection = new Vector3(_input.move.x, 0.0f, _input.move.y).normalized;
+            Vector3 inputDirection = new Vector3(horizontalInput.x, 0.0f, 0.0f).normalized;
 
             // note: Vector2's != operator uses approximation so is not floating point error prone, and is cheaper than magnitude
             // if there is a move input rotate player when the player is moving
-            if (_input.move != Vector2.zero)
+            if (horizontalInput != Vector2.zero)
             {
-                _targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg +
-                                  _mainCamera.transform.eulerAngles.y;
-                float rotation = Mathf.SmoothDampAngle(transform.eulerAngles.y, _targetRotation, ref _rotationVelocity,
-                    RotationSmoothTime);
-
-                // rotate to face input direction relative to camera position
-                transform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
+                _targetRotation = horizontalInput.x > 0 ? 90.0f : 270.0f;
+                // rotate instantly to face along the world X axis direction we are moving
+                _rotationVelocity = 0f;
+                transform.rotation = Quaternion.Euler(0.0f, _targetRotation, 0.0f);
             }
 
 
-            Vector3 targetDirection = Quaternion.Euler(0.0f, _targetRotation, 0.0f) * Vector3.forward;
+            Vector3 targetDirection = inputDirection;
 
             // move the player
             _controller.Move(targetDirection.normalized * (_speed * Time.deltaTime) +
                              new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+
+            // If we are very close to the floor (ink/ground), snap down to avoid gaps
+            StickToGround();
 
             // update animator if using character
             if (_hasAnimator)
             {
                 _animator.SetFloat(_animIDSpeed, _animationBlend);
                 _animator.SetFloat(_animIDMotionSpeed, inputMagnitude);
+            }
+        }
+
+        private void StickToGround()
+        {
+            if (_controller == null) return;
+            if (_verticalVelocity > 0f) return;
+
+            // Cast a short sphere downwards to detect nearby ground/ink and snap to it
+            float sphereRadius = Mathf.Max(0.01f, _controller.radius * 0.95f);
+            Vector3 origin = transform.position + Vector3.up * GroundSnapRayOffset;
+            float maxDistance = _controller.stepOffset + GroundSnapDistance + GroundSnapRayOffset;
+
+            if (Physics.SphereCast(origin, sphereRadius, Vector3.down, out RaycastHit hit, maxDistance, GroundLayers, QueryTriggerInteraction.Ignore))
+            {
+                float snapDistance = hit.distance - GroundSnapRayOffset;
+                if (snapDistance > 0f && snapDistance <= _controller.stepOffset + GroundSnapDistance)
+                {
+                    _controller.Move(Vector3.down * snapDistance);
+                    if (_verticalVelocity < 0f) _verticalVelocity = -2f;
+                    Grounded = true;
+                }
             }
         }
 

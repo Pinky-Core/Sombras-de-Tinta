@@ -1,6 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
+using StarterAssets;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 /// <summary>
 /// Plays a camera intro using a list of fixed points defined in the scene.
@@ -23,6 +27,10 @@ public class LevelIntroPath : MonoBehaviour
     private Transform _player;
     private Behaviour _playerMovement;
     private InkDrawer _inkDrawer;
+    private readonly List<Behaviour> _disabledDuringIntro = new List<Behaviour>();
+#if ENABLE_INPUT_SYSTEM
+    private PlayerInput _playerInput;
+#endif
     private Vector3 _startPos;
     private Quaternion _startRot;
     private float _startFov;
@@ -190,19 +198,23 @@ public class LevelIntroPath : MonoBehaviour
     private void CachePlayer()
     {
         var player3D = FindFirstObjectByType<PlayerController3D>();
+        var playerSide = player3D == null ? FindFirstObjectByType<PlayerControllerSide3D>() : null;
+        var starterController = player3D == null && playerSide == null ? FindFirstObjectByType<ThirdPersonController>() : null;
+
         if (player3D != null)
         {
             _player = player3D.transform;
             _playerMovement = player3D.GetComponent<Behaviour>();
         }
-        else
+        else if (playerSide != null)
         {
-            var playerSide = FindFirstObjectByType<PlayerControllerSide3D>();
-            if (playerSide != null)
-            {
-                _player = playerSide.transform;
-                _playerMovement = playerSide.GetComponent<Behaviour>();
-            }
+            _player = playerSide.transform;
+            _playerMovement = playerSide.GetComponent<Behaviour>();
+        }
+        else if (starterController != null)
+        {
+            _player = starterController.transform;
+            _playerMovement = starterController.GetComponent<Behaviour>();
         }
 
         if (_player != null)
@@ -214,14 +226,40 @@ public class LevelIntroPath : MonoBehaviour
     private void DisablePlayerControl()
     {
         CachePlayer();
-        if (_playerMovement != null) _playerMovement.enabled = false;
-        if (_inkDrawer != null) _inkDrawer.enabled = false;
+        _disabledDuringIntro.Clear();
+
+        AddBehaviour(_playerMovement);
+        AddBehaviour(_player ? _player.GetComponent<ThirdPersonController>() : null);
+        AddBehaviour(_player ? _player.GetComponent<StarterAssetsInputs>() : null);
+#if ENABLE_INPUT_SYSTEM
+        _playerInput = _player ? _player.GetComponent<PlayerInput>() : null;
+        if (_playerInput && _playerInput.enabled) _playerInput.enabled = false;
+#endif
+
+        if (_inkDrawer != null && _inkDrawer.enabled) _inkDrawer.enabled = false;
     }
 
     private void EnablePlayerControl()
     {
-        if (_playerMovement != null) _playerMovement.enabled = true;
+        foreach (var behaviour in _disabledDuringIntro)
+        {
+            if (behaviour != null) behaviour.enabled = true;
+        }
+        _disabledDuringIntro.Clear();
+
         if (_inkDrawer != null) _inkDrawer.enabled = true;
+#if ENABLE_INPUT_SYSTEM
+        if (_playerInput != null) _playerInput.enabled = true;
+#endif
+    }
+
+    private void AddBehaviour(Behaviour behaviour)
+    {
+        if (behaviour != null && behaviour.enabled)
+        {
+            behaviour.enabled = false;
+            _disabledDuringIntro.Add(behaviour);
+        }
     }
 
     private static float SmootherStep(float t)
