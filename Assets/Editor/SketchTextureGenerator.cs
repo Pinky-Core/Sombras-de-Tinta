@@ -107,7 +107,7 @@ public static class SketchTextureGenerator
                 float widthNoise = (Mathf.PerlinNoise(along * 0.8f, across * 4f) - 0.5f) * 0.15f;
                 float localWidth = Mathf.Max(0.05f, baseWidth + widthNoise);
 
-                float dist = Mathf.Abs(frac(along + jitter) - 0.5f);
+                float dist = Mathf.Abs(Mathf.Repeat(along + jitter, 1f) - 0.5f);
                 float line = Mathf.SmoothStep(0f, 1f, (0.5f - dist) / localWidth);
 
                 // Micro gaps para simular saltos de lápiz
