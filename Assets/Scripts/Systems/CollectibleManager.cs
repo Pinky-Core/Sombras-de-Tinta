@@ -29,6 +29,7 @@ public class CollectibleManager : MonoBehaviour
 
     private readonly HashSet<CollectibleItem> registeredItems = new HashSet<CollectibleItem>();
     private readonly HashSet<CollectibleItem> collectedItems = new HashSet<CollectibleItem>();
+    private int expectedTotal;
 
     private void Awake()
     {
@@ -45,6 +46,14 @@ public class CollectibleManager : MonoBehaviour
         {
             finalObjectToEnable.SetActive(false);
         }
+    }
+
+    private void Start()
+    {
+        // Contar todos los coleccionables presentes en la escena al inicio
+        var allCollectibles = FindObjectsByType<CollectibleItem>(FindObjectsSortMode.None);
+        expectedTotal = allCollectibles.Length;
+        RaiseProgressChanged();
     }
 
     private void OnDestroy()
@@ -64,6 +73,9 @@ public class CollectibleManager : MonoBehaviour
 
         if (registeredItems.Add(item))
         {
+            // Asegurar que el total esperado siempre sea al menos la cantidad registrada
+            expectedTotal = Mathf.Max(expectedTotal, registeredItems.Count);
+
             // If the item was already collected before being re-enabled, keep it counted.
             if (item.IsAlreadyCollected && collectedItems.Add(item))
             {
@@ -108,17 +120,20 @@ public class CollectibleManager : MonoBehaviour
 
     private void RaiseProgressChanged()
     {
-        onProgressChanged?.Invoke(collectedItems.Count, registeredItems.Count);
+        int targetTotal = expectedTotal > 0 ? expectedTotal : registeredItems.Count;
+        onProgressChanged?.Invoke(collectedItems.Count, targetTotal);
     }
 
     private void TryCompleteRun()
     {
-        if (registeredItems.Count == 0)
+        int targetTotal = expectedTotal > 0 ? expectedTotal : registeredItems.Count;
+
+        if (targetTotal == 0)
         {
             return;
         }
 
-        if (collectedItems.Count < registeredItems.Count)
+        if (collectedItems.Count < targetTotal)
         {
             return;
         }

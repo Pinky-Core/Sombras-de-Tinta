@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class PauseMenu : MonoBehaviour
 {
+    public static bool IsPaused { get; private set; }
+
     public GameObject pausePanel;
     public bool showCursorOnResume = true; // Solicitud: volver a mostrar cursor al salir del menú de pausa
     bool _paused;
@@ -22,6 +24,7 @@ public class PauseMenu : MonoBehaviour
     public void Pause()
     {
         _paused = true;
+        IsPaused = true;
         Time.timeScale = 0f;
         if (pausePanel) pausePanel.SetActive(true);
         Cursor.visible = true; Cursor.lockState = CursorLockMode.None;
@@ -30,6 +33,7 @@ public class PauseMenu : MonoBehaviour
     public void Resume()
     {
         _paused = false;
+        IsPaused = false;
         Time.timeScale = 1f;
         if (pausePanel) pausePanel.SetActive(false);
         if (showCursorOnResume) { Cursor.visible = true; Cursor.lockState = CursorLockMode.None; }
@@ -41,6 +45,7 @@ public class PauseMenu : MonoBehaviour
     {
         Time.timeScale = 1f;
         _paused = false;
+        IsPaused = false;
         if (pausePanel) pausePanel.SetActive(false);
         Cursor.visible = true; Cursor.lockState = CursorLockMode.None;
         SceneLoader.Reload();
@@ -50,6 +55,7 @@ public class PauseMenu : MonoBehaviour
     public void QuitGame()
     {
         Time.timeScale = 1f;
+        IsPaused = false;
         SceneLoader.Quit();
     }
 }

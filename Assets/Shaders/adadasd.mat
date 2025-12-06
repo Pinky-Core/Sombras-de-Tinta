@@ -49,11 +49,11 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _LineTex1:
-        m_Texture: {fileID: 2800000, guid: ce60e531f23c0af4da5778d111702024, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 182.52, y: 17.31}
         m_Offset: {x: -37.89, y: -42.87}
     - _LineTex2:
-        m_Texture: {fileID: 2800000, guid: a638c96209c5ea8439b63ab9dfa74c4a, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
@@ -134,7 +134,7 @@ Material:
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 1, g: 0.94912, b: 0.8632076, a: 1}
+    - _BaseColor: {r: 0.3679245, g: 0.3679245, b: 0.3679245, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}

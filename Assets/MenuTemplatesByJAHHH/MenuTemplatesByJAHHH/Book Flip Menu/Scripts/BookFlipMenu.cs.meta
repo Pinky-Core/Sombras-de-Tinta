@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 703230d557ef52542b259f7c0f8c1b8b
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 306955
+  packageName: Basic Moving Menu Templates (FREE)
+  packageVersion: 1.1.0
+  assetPath: Assets/MenuTemplatesByJAHHH/MenuTemplatesByJAHHH/Book Flip Menu/Scripts/BookFlipMenu.cs
+  uploadId: 742968

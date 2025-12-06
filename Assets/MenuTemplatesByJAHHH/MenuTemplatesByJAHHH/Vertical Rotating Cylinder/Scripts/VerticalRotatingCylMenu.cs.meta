@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 75a1a1d0574702b4ea6cd87d4e8e7fda
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 306955
+  packageName: Basic Moving Menu Templates (FREE)
+  packageVersion: 1.1.0
+  assetPath: Assets/MenuTemplatesByJAHHH/MenuTemplatesByJAHHH/Vertical Rotating Cylinder/Scripts/VerticalRotatingCylMenu.cs
+  uploadId: 742968

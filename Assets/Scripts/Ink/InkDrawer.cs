@@ -11,6 +11,12 @@ public class InkDrawer : MonoBehaviour
     public float minStep = 0.2f;
     public LayerMask drawMask = ~0; // everything by default
 
+    [Header("Ink Economy")]
+    public float passiveRegenPerSecond = 1f;
+    public float baseRedrawCost = 6f;
+    public float allyExtraCost = 8f;
+    public float killExtraCost = 0f;
+
     [Header("Placement")]
     public float offsetFromSurface = 0.01f;
 
@@ -44,6 +50,7 @@ public class InkDrawer : MonoBehaviour
 
     Vector3 _lastPoint;
     bool _drawing;
+    public static bool IsDrawing { get; private set; }
     Material _inkMat;
     ShapeDetector _shapeDetector;
     List<GameObject> _currentTraceInk = new List<GameObject>();
@@ -81,11 +88,22 @@ public class InkDrawer : MonoBehaviour
     void Update()
     {
         if (Camera.main == null) return;
+        if (PauseMenu.IsPaused) return;
+        if (LevelIntroPanorama.IntroPlaying) return;
+        if (Time.timeScale <= 0f) return;
+        if (currentInk <= 0f) { _drawing = false; IsDrawing = false; return; }
+
+        // Regen pasivo de tinta
+        if (passiveRegenPerSecond > 0f && currentInk < maxInk)
+        {
+            currentInk = Mathf.Min(maxInk, currentInk + passiveRegenPerSecond * Time.deltaTime);
+        }
 
         // Start/stop drawing with left mouse
         if (InputProvider.LeftMouseDown())
         {
             _drawing = true;
+            IsDrawing = true;
             _lastPoint = Vector3.positiveInfinity; // force place first
             _currentTraceInk.Clear();
             if (_shapeDetector != null) _shapeDetector.StartTrace();
@@ -94,6 +112,7 @@ public class InkDrawer : MonoBehaviour
         if (InputProvider.LeftMouseUp())
         {
             _drawing = false;
+            IsDrawing = false;
             
             // Detectar enemigo al finalizar trazo (mecánica simplificada)
             if (enableShapeDetection && _currentTraceInk.Count > 0)
@@ -115,11 +134,11 @@ public class InkDrawer : MonoBehaviour
                 {
                     if (enemy.CanRedraw)
                     {
-                        float costRedraw = Mathf.Max(5f, brushRadius * costPerMeter * 2f);
+                        float baseCost = Mathf.Max(baseRedrawCost, brushRadius * costPerMeter);
+                        bool toAlly = InputProvider.ShiftHeld();
+                        float costRedraw = toAlly ? baseCost + allyExtraCost : baseCost;
                         if (currentInk >= costRedraw)
                         {
-                            // Sin Shift = plataforma, Con Shift = aliado (coherente con HUD)
-                            bool toAlly = InputProvider.ShiftHeld();
                             enemy.ApplyRedraw(toAlly);
                             if (toAlly)
                             {
@@ -183,11 +202,17 @@ public class InkDrawer : MonoBehaviour
                     {
                         var inkSegment = PlaceInkSegment(point, float.IsFinite(_lastPoint.x) ? _lastPoint : (Vector3?)null);
                         _currentTraceInk.Add(inkSegment);
-                        currentInk -= cost;
+                        currentInk = Mathf.Max(0f, currentInk - cost);
                         _lastPoint = point;
                         
                         // Agregar punto al detector de formas
                         if (_shapeDetector != null) _shapeDetector.AddPoint(point);
+
+                        if (currentInk <= 0.001f)
+                        {
+                            currentInk = 0f;
+                            _drawing = false;
+                        }
                     }
                     else if (currentInk > 0.01f)
                     {
@@ -379,10 +404,20 @@ public class InkDrawer : MonoBehaviour
             {
                 if (targetEnemy.CanRedraw)
                 {
-                    targetEnemy.ApplyRedraw(true); // Shift + raya = aliado
-                    actionPerformed = true;
-                    TutorialEventBus.RaiseTaskCompleted(TutorialTaskIds.ConvertAlly);
-                    Debug.Log("Shift + raya - Enemigo convertido a aliado!");
+                    float baseCost = Mathf.Max(baseRedrawCost, brushRadius * costPerMeter);
+                    float allyCost = baseCost + allyExtraCost;
+                    if (currentInk >= allyCost)
+                    {
+                        currentInk -= allyCost;
+                        targetEnemy.ApplyRedraw(true); // Shift + raya = aliado
+                        actionPerformed = true;
+                        TutorialEventBus.RaiseTaskCompleted(TutorialTaskIds.ConvertAlly);
+                        Debug.Log("Shift + raya - Enemigo convertido a aliado!");
+                    }
+                    else
+                    {
+                        Debug.Log("No hay tinta suficiente para convertir en aliado");
+                    }
                 }
                 else
                 {
@@ -393,16 +428,25 @@ public class InkDrawer : MonoBehaviour
             {
                 if (targetEnemy.CanKill)
                 {
-                    bool killed = ApplyLineDamage(targetEnemy);
-                    if (killed)
+                    float killCost = Mathf.Max(0f, killExtraCost);
+                    if (currentInk >= killCost)
                     {
-                        actionPerformed = true;
-                        TutorialEventBus.RaiseTaskCompleted(TutorialTaskIds.KillWithLine);
-                        Debug.Log("Raya sobre enemigo - Enemigo eliminado!");
+                        currentInk -= killCost;
+                        bool killed = ApplyLineDamage(targetEnemy);
+                        if (killed)
+                        {
+                            actionPerformed = true;
+                            TutorialEventBus.RaiseTaskCompleted(TutorialTaskIds.KillWithLine);
+                            Debug.Log("Raya sobre enemigo - Enemigo eliminado!");
+                        }
+                        else
+                        {
+                            Debug.Log("Raya detectada pero el enemigo aún sigue con vida.");
+                        }
                     }
                     else
                     {
-                        Debug.Log("Raya detectada pero el enemigo aún sigue con vida.");
+                        Debug.Log("No hay tinta suficiente para atacar al enemigo");
                     }
                 }
                 else
@@ -475,15 +519,5 @@ public class InkDrawer : MonoBehaviour
         return true;
     }
 
-    void OnGUI()
-    {
-        const float w = 300f;
-        const float h = 24f;
-        Rect r = new Rect(10, 10, w, h);
-        GUI.Box(r, $"Tinta: {Mathf.CeilToInt(currentInk)} / {Mathf.CeilToInt(maxInk)}  (Matar enemigos regenera tinta)");
-        
-        // Mostrar controles
-        Rect r2 = new Rect(10, 40, w, h);
-        GUI.Box(r2, "Raya sobre enemigo = Matar | Shift + Raya = Aliado");
-    }
+    // HUD desactivado: textos de tinta y controles removidos
 }

@@ -31,6 +31,10 @@ public class PlayerController3D : MonoBehaviour
     {
         // Get camera-relative input
         Vector2 input = InputProvider.MoveAxis();
+        if (InkDrawer.IsDrawing)
+        {
+            input.x = 0f; // bloquear desplazamiento lateral mientras se dibuja
+        }
         input = Vector2.ClampMagnitude(input, 1f);
 
         Vector3 camForward = Vector3.forward;

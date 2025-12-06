@@ -36,6 +36,7 @@ public class PlayerControllerSide3D : MonoBehaviour
     {
         // Only horizontal (X) input for side-scroller
         float h = Mathf.Clamp(InputProvider.MoveAxis().x, -1f, 1f);
+        if (InkDrawer.IsDrawing) h = 0f; // bloquear movimiento en X mientras se dibuja
         float accel = _cc.isGrounded ? acceleration : acceleration * airControl;
         float t = 1f - Mathf.Exp(-accel * Time.deltaTime);
         float desiredX = h * moveSpeed;

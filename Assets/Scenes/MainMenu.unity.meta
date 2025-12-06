@@ -1,7 +1,14 @@
 fileFormatVersion: 2
-guid: 5c0dd8608795e4d46a21b2f11d538d6a
+guid: 80cd911ad375f1444bb9fbfbd864b696
 DefaultImporter:
   externalObjects: {}
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 306955
+  packageName: Basic Moving Menu Templates (FREE)
+  packageVersion: 1.1.0
+  assetPath: Assets/MenuTemplatesByJAHHH/MenuTemplatesByJAHHH/DemoScene/menus.unity
+  uploadId: 742968

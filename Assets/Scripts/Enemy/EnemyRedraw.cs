@@ -125,6 +125,8 @@ public class EnemyRedraw : MonoBehaviour
             rend.sharedMaterial = mat;
         }
         gameObject.name = "EnemyPlatform";
+
+        EnsureColliderAndSnap();
     }
 
     void ConvertToAlly()
@@ -150,9 +152,15 @@ public class EnemyRedraw : MonoBehaviour
         {
             ally = gameObject.AddComponent<AllyFollower>();
         }
+        ally.enabled = true;
+        var target = FindPlayerTransform();
+        ally.manualTarget = target;
+        ally.SetTarget(target);
         
         // Agregar indicador visual permanente (borde o glow)
         AddAllyIndicator();
+
+        EnsureColliderAndSnap();
     }
     
     void AddAllyIndicator()
@@ -226,6 +234,55 @@ public class EnemyRedraw : MonoBehaviour
         else
         {
             CreateCodedDeathParticles();
+        }
+    }
+
+    Transform FindPlayerTransform()
+    {
+        var tagged = GameObject.FindGameObjectWithTag("Player");
+        if (tagged != null) return tagged.transform;
+
+        var p = FindFirstObjectByType<PlayerController3D>();
+        if (p != null) return p.transform;
+        var p2 = FindFirstObjectByType<PlayerControllerSide3D>();
+        return p2 != null ? p2.transform : null;
+    }
+
+    void EnsureColliderAndSnap()
+    {
+        var col = GetComponent<Collider>();
+        if (col == null)
+        {
+            col = gameObject.AddComponent<CapsuleCollider>();
+        }
+
+        col.isTrigger = false;
+
+        if (col is CapsuleCollider cap)
+        {
+            cap.direction = 1;
+            cap.radius = Mathf.Max(0.3f, cap.radius);
+            cap.height = Mathf.Max(cap.height, cap.radius * 2f);
+        }
+        else if (col is BoxCollider box)
+        {
+            Vector3 size = box.size;
+            size.y = Mathf.Max(size.y, 0.8f);
+            box.size = size;
+            box.center = new Vector3(box.center.x, Mathf.Max(box.center.y, size.y * 0.5f), box.center.z);
+        }
+
+        SnapToGround();
+    }
+
+    void SnapToGround()
+    {
+        Vector3 origin = transform.position + Vector3.up * 0.5f;
+        if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 3f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+        {
+            Vector3 pos = transform.position;
+            pos.y = hit.point.y;
+            transform.position = pos;
         }
     }
     

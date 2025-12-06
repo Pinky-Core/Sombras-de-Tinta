@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 1218a2fa5b033314f836b92bca32f047
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 306955
+  packageName: Basic Moving Menu Templates (FREE)
+  packageVersion: 1.1.0
+  assetPath: Assets/MenuTemplatesByJAHHH/MenuTemplatesByJAHHH/Spin Flip Menu/Scripts/SpinFlipMenu.cs
+  uploadId: 742968

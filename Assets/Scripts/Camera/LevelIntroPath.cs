@@ -43,6 +43,9 @@ public class LevelIntroPath : MonoBehaviour
             followCamera = Camera.main ? Camera.main.GetComponent<SmoothFollowCamera>() : GetComponent<SmoothFollowCamera>();
         }
         CachePlayer();
+
+        // Registrar estado global de intro para otros sistemas (ej. InkDrawer)
+        LevelIntroPanorama.IntroPlaying = true;
     }
 
     private void Start()
@@ -120,6 +123,7 @@ public class LevelIntroPath : MonoBehaviour
         }
 
         _playing = false;
+        LevelIntroPanorama.IntroPlaying = false;
     }
 
     private IEnumerator TweenTo(Vector3 targetPos, Quaternion targetRot, float fromFov, float toFov, float duration)
@@ -237,6 +241,19 @@ public class LevelIntroPath : MonoBehaviour
 #endif
 
         if (_inkDrawer != null && _inkDrawer.enabled) _inkDrawer.enabled = false;
+
+        // Bloquear movimiento lateral si hay Rigidbody o CharacterController
+        var rb = _player ? _player.GetComponent<Rigidbody>() : null;
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.constraints |= RigidbodyConstraints.FreezePositionX | RigidbodyConstraints.FreezePositionZ;
+        }
+        var cc = _player ? _player.GetComponent<CharacterController>() : null;
+        if (cc != null)
+        {
+            // No tiene constraints, pero deshabilitar movimiento al dejar _playerMovement apagado cubre el caso
+        }
     }
 
     private void EnablePlayerControl()
@@ -251,6 +268,12 @@ public class LevelIntroPath : MonoBehaviour
 #if ENABLE_INPUT_SYSTEM
         if (_playerInput != null) _playerInput.enabled = true;
 #endif
+
+        var rb = _player ? _player.GetComponent<Rigidbody>() : null;
+        if (rb != null)
+        {
+            rb.constraints &= ~(RigidbodyConstraints.FreezePositionX | RigidbodyConstraints.FreezePositionZ);
+        }
     }
 
     private void AddBehaviour(Behaviour behaviour)

@@ -10,6 +10,8 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(Camera))]
 public class LevelIntroPanorama : MonoBehaviour
 {
+    public static bool IntroPlaying { get; internal set; }
+
     [Header("Setup")]
     public bool playOnStart = true;
     public Transform player;
@@ -71,6 +73,7 @@ public class LevelIntroPanorama : MonoBehaviour
     public void StartIntro()
     {
         if (_playing) return;
+        IntroPlaying = true;
         StartCoroutine(PlayIntroCo());
     }
 
@@ -182,6 +185,7 @@ public class LevelIntroPanorama : MonoBehaviour
         EnablePlayerControl();
 
         _playing = false;
+        IntroPlaying = false;
     }
 
     (float minX, float maxX, float centerX) ComputeLevelBoundsX()

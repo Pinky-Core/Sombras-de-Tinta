@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 7dbde285d30b10d458a3717b598923c8
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 306955
+  packageName: Basic Moving Menu Templates (FREE)
+  packageVersion: 1.1.0
+  assetPath: Assets/MenuTemplatesByJAHHH/MenuTemplatesByJAHHH/Audio/AudioManagerScripts/AudioManager.cs
+  uploadId: 742968

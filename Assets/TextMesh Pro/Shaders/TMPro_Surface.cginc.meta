@@ -7,3 +7,10 @@ ShaderImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 306955
+  packageName: Basic Moving Menu Templates (FREE)
+  packageVersion: 1.1.0
+  assetPath: Assets/TextMesh Pro/Shaders/TMPro_Surface.cginc
+  uploadId: 742968
