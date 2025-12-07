@@ -7,13 +7,13 @@ namespace MenuTemplatesByJAHHH
 
     public class BookFlipMenu : MonoBehaviour
     {
-        [SerializeField] private GameObject[] pages; // Array of canvases that represent the pages
+        [SerializeField] private GameObject[] pages; 
         [SerializeField] private Button forwardButton; 
         [SerializeField] private Button backButton;
-        [SerializeField] private float flipDuration = 1.0f; 
+        [SerializeField] private float flipDuration = 1.0f;
 
         private bool isFlipping = false;
-        private int currentPageIndex = 0; 
+        private int currentPageIndex = 0;
 
         [SerializeField] private Button controlsButton;
         [SerializeField] private Button controlsBackButton;
@@ -22,6 +22,11 @@ namespace MenuTemplatesByJAHHH
         [SerializeField] private Button quitButton;
 
         [SerializeField] private AudioManager audioManager;
+
+        // ⚡ NUEVO: sonidos aleatorios para pasar página
+        [SerializeField] private AudioClip[] pageFlipSounds;
+        [SerializeField] private float pageFlipVolume = 1f;
+
         [SerializeField, Tooltip("Si está activo, deshabilita este componente si faltan referencias en lugar de crashear.")]
         private bool disableOnMissingReferences = true;
 
@@ -37,7 +42,6 @@ namespace MenuTemplatesByJAHHH
             startButton.onClick.AddListener(StartGame);
             quitButton.onClick.AddListener(QuitGame);
 
-
             controlsCanvas.SetActive(false);
 
             if (forwardButton == null || backButton == null)
@@ -49,14 +53,13 @@ namespace MenuTemplatesByJAHHH
             forwardButton.onClick.AddListener(GoForwardPage);
             backButton.onClick.AddListener(GoBackPage);
 
-            
             for (int i = 0; i < pages.Length; i++)
             {
-                pages[i].SetActive(i == 0); 
-                SetPagePivot(pages[i], new Vector2(0, 0.5f)); 
+                pages[i].SetActive(i == 0);
+                SetPagePivot(pages[i], new Vector2(0, 0.5f));
             }
 
-            backButton.interactable = false; 
+            backButton.interactable = false;
         }
 
         bool ValidateReferences()
@@ -79,6 +82,7 @@ namespace MenuTemplatesByJAHHH
             if (isFlipping || currentPageIndex >= pages.Length - 1)
                 return;
 
+            PlayRandomPageFlipSound();
             StartCoroutine(FlipPage(true));
         }
 
@@ -87,6 +91,7 @@ namespace MenuTemplatesByJAHHH
             if (isFlipping || currentPageIndex <= 0)
                 return;
 
+            PlayRandomPageFlipSound();
             StartCoroutine(FlipPage(false));
         }
 
@@ -98,10 +103,8 @@ namespace MenuTemplatesByJAHHH
             int targetPageIndex = forward ? currentPageIndex + 1 : currentPageIndex - 1;
             GameObject targetPage = pages[targetPageIndex];
 
-           
             targetPage.SetActive(true);
 
-            
             float elapsedTime = 0f;
             float startAngle = forward ? 0f : 180f;
             float endAngle = forward ? 180f : 0f;
@@ -118,7 +121,6 @@ namespace MenuTemplatesByJAHHH
 
             if (forward)
             {
-                
                 if (currentPageIndex < pages.Length - 1)
                 {
                     currentPage.transform.SetSiblingIndex(0);
@@ -127,29 +129,25 @@ namespace MenuTemplatesByJAHHH
 
             currentPageIndex = targetPageIndex;
 
-           
             targetPage.transform.localRotation = Quaternion.Euler(0, 0, 0);
 
-            
             for (int i = 0; i <= currentPageIndex; i++)
             {
                 pages[i].SetActive(true);
             }
 
-           
             UpdatePageOrder();
-
             UpdateButtons();
             isFlipping = false;
         }
 
         private void UpdatePageOrder()
         {
-            for (int i = 0; i < pages.Length - 1; i++) 
+            for (int i = 0; i < pages.Length - 1; i++)
             {
                 if (i == currentPageIndex)
                 {
-                    pages[i].transform.SetSiblingIndex(pages.Length - 2); 
+                    pages[i].transform.SetSiblingIndex(pages.Length - 2);
                 }
                 else
                 {
@@ -173,8 +171,6 @@ namespace MenuTemplatesByJAHHH
             }
         }
 
-
-
         private void OpenControlsCanvas()
         {
             controlsCanvas.SetActive(true);
@@ -182,34 +178,42 @@ namespace MenuTemplatesByJAHHH
 
         private void CloseControlsCanvas()
         {
-
             controlsCanvas.SetActive(false);
         }
 
         private void PlayClickSound()
         {
             if (audioManager != null) audioManager.PlaySound(AudioTracks.buttonClickSound);
-
         }
 
         private void PlaySwitchSound()
         {
             if (audioManager != null) audioManager.PlaySound(AudioTracks.screenSwitchSound);
         }
-         
+
+        // ⚡ NUEVO: reproducir un sonido aleatorio de pasar página
+        private void PlayRandomPageFlipSound()
+        {
+            if (audioManager == null || pageFlipSounds == null || pageFlipSounds.Length == 0)
+                return;
+
+            int index = Random.Range(0, pageFlipSounds.Length);
+            AudioClip clip = pageFlipSounds[index];
+
+            audioManager.PlaySound(clip);
+        }
+
         private void StartGame()
         {
-            //SceneManager.LoadScene("Level");      CHANGE THIS TO THE SCENE YOU WANT TO LOAD
+            //SceneManager.LoadScene("Level");  
         }
 
         private void QuitGame()
         {
 #if UNITY_EDITOR
-         
             UnityEditor.EditorApplication.isPlaying = false;
 #else
-        // If in a build, quit the application
-        Application.Quit();
+            Application.Quit();
 #endif
         }
     }

@@ -120,5 +120,15 @@ namespace MenuTemplatesByJAHHH
                 }
             }
         }
+
+        public void PlaySound(AudioClip clip)
+        {
+            if (audioSource != null && clip != null)
+            {
+                audioSource.PlayOneShot(clip);
+            }
+        }
+
     }
+
 }
