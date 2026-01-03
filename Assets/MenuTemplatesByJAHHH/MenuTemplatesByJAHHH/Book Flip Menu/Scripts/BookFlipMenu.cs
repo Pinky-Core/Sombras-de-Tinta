@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 namespace MenuTemplatesByJAHHH
 {
@@ -205,7 +206,7 @@ namespace MenuTemplatesByJAHHH
 
         private void StartGame()
         {
-            //SceneManager.LoadScene("Level");  
+            SceneManager.LoadScene("Level_1");  
         }
 
         private void QuitGame()
